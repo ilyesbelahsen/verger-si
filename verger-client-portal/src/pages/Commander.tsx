@@ -232,8 +232,7 @@ export default function Commander() {
       ? selectedBasket?.products
           .filter((p) => customProductsSelected[p.id])
           .reduce(
-            (sum, p) =>
-              sum + (p.price || 2) * (customProductQuantities[p.id] || 1),
+            (sum, p) => sum + (p.price || 2) * customProductQuantities[p.id],
             0,
           ) * (isSubscription ? 4 : 1)
       : (selectedBasket?.price || 0) * (isSubscription ? 4 : 1);
@@ -301,7 +300,7 @@ export default function Commander() {
               .map((p) => ({
                 id: p.id,
                 quantity: customProductQuantities[p.id] || 1,
-                price: p.price ?? 2,
+                price: p.price,
               }))
           : undefined;
 

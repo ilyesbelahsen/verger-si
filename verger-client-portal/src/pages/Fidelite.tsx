@@ -24,13 +24,13 @@ const loyaltySchema = z.object({
 const benefits = [
   {
     icon: Star,
-    title: '50 points de bienvenue',
+    title: '10 points de bienvenue',
     description: 'Offerts dès votre inscription au programme',
   },
   {
     icon: Percent,
     title: 'Réductions exclusives',
-    description: 'Jusqu\'à 15% de réduction sur vos paniers',
+    description: 'Jusqu\'à 10% de réduction sur vos paniers',
   },
   {
     icon: Gift,

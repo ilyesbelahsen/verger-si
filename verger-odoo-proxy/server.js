@@ -12,6 +12,9 @@ const ODOO_DB = "le-verger-du-coin3";
 const ODOO_LOGIN = "belahsenilyes212@gmail.com";
 const ODOO_PASSWORD = "ILYESdu12?";
 
+const ACTIVATION_PRODUCT_ID = 321; // ton vrai ID
+const PROGRAM_ID = 2;
+
 /* ====== SESSION ====== */
 let cookies = "";
 
@@ -49,6 +52,9 @@ async function odooCall(model, method, args = [], kwargs = {}) {
   });
 
   const data = await res.json();
+  if (!data.result) {
+    console.warn(`⚠️ odooCall ${model}.${method} returned undefined`, data);
+  }
   return data.result;
 }
 
@@ -57,10 +63,21 @@ async function odooCall(model, method, args = [], kwargs = {}) {
 // Récupérer produits
 app.get("/products", async (req, res) => {
   await odooLogin();
-  const products = await odooCall("product.template", "search_read", [
-    [["sale_ok", "=", true]],
-  ]);
-  res.json(products);
+  const products = await odooCall(
+    "product.product",
+    "search_read",
+    [[["sale_ok", "=", true]]],
+    { fields: ["id", "name", "categ_id", "list_price"] },
+  );
+
+  const formatted = products.map((p) => ({
+    id: p.id,
+    name: p.name,
+    category: p.categ_id ? p.categ_id[1] : "",
+    price: p.list_price,
+  }));
+
+  res.json(formatted);
 });
 
 // Créer client
@@ -80,180 +97,193 @@ app.post("/customer", async (req, res) => {
 // Créer ou récupérer un client
 app.post("/customer-or-create", async (req, res) => {
   const { name, email, phone, rgpdConsent } = req.body;
-  await odooLogin();
 
-  const existingCustomers = await odooCall("res.partner", "search_read", [
-    [["email", "=", email]],
-    ["id", "name", "email", "phone"],
-  ]);
+  try {
+    await odooLogin();
 
-  let customerId;
-  if (existingCustomers.length > 0) {
-    customerId = existingCustomers[0].id;
-  } else {
-    customerId = await odooCall("res.partner", "create", [
-      {
-        name,
-        email,
-        phone,
-        customer_rank: 1,
-        x_rgpd_consent: rgpdConsent,
-      },
-    ]);
+    const existingCustomers = await odooCall(
+      "res.partner",
+      "search_read",
+      [[["email", "=", email]]],
+      { fields: ["id", "name", "email", "phone"] },
+    );
+
+    let customerId;
+
+    if (existingCustomers.length > 0) {
+      customerId = existingCustomers[0].id;
+    } else {
+      const created = await odooCall("res.partner", "create", [
+        { name, email, phone, customer_rank: 1 },
+      ]);
+
+      if (typeof created === "number") {
+        customerId = created;
+      } else if (Array.isArray(created) && created.length > 0) {
+        customerId = created[0];
+      } else if (created && typeof created === "object" && "id" in created) {
+        customerId = created.id;
+      } else {
+        return res.status(500).json({ error: "Impossible de créer le client" });
+      }
+    }
+
+    res.json({ customerId });
+  } catch (err) {
+    console.error("❌ Erreur dans /customer-or-create :", err);
+    res
+      .status(500)
+      .json({ error: "Erreur serveur lors de la création du client" });
   }
-
-  res.json({ customerId });
 });
 
 // Créer commande panier
+// Créer commande panier
 app.post("/order", async (req, res) => {
   const { customerId, basketId, pickupPoint, products } = req.body;
-  console.log("\n🔵 === DÉBUT CRÉATION COMMANDE ===");
-  console.log("📦 Données reçues:", {
-    customerId,
-    basketId,
-    pickupPoint,
-    products,
-  });
 
-  await odooLogin();
+  if (!customerId)
+    return res.status(400).json({ error: "customerId manquant" });
 
-  let orderLines = [];
+  try {
+    await odooLogin();
+    console.log("🟢 Création de la commande pour customerId:", customerId);
 
-  // Produits personnalisés
-  if (products && products.length > 0) {
-    console.log("🛒 Mode: Produits personnalisés");
-    orderLines = products.map((p) => {
-      console.log(
-        `  - Produit ID ${p.id}: ${p.quantity} unité(s) à ${p.price}€`,
+    let orderLines = [];
+    let totalOrder = 0;
+
+    // === 1️⃣ Produits personnalisés ===
+    if (products && products.length > 0) {
+      orderLines = products.map((p) => [
+        0,
+        0,
+        {
+          product_id: p.id,
+          product_uom_qty: p.quantity,
+          price_unit: p.price,
+        },
+      ]);
+
+      totalOrder = orderLines.reduce(
+        (sum, line) => sum + line[2].price_unit * line[2].product_uom_qty,
+        0,
       );
-      return [
-        0,
-        0,
-        { product_id: p.id, product_uom_qty: p.quantity, price_unit: p.price },
-      ];
-    });
-  }
-  // Panier avec BOM (ID > 0)
-  else if (basketId && basketId > 0) {
-    console.log("🛒 Mode: Panier avec BOM, ID:", basketId);
-
-    const basket = await odooCall("product.template", "read", [
-      [basketId],
-      ["bom_ids", "list_price"],
-    ]);
-    if (!basket || basket.length === 0) {
-      return res.status(400).json({ error: "Panier introuvable" });
     }
+    // === 2️⃣ Panier avec BOM / préconfiguré ===
+    else if (basketId && basketId > 0) {
+      console.log("📦 Panier avec BOM ID:", basketId);
 
-    if (!basket[0].bom_ids?.length) {
-      return res.status(400).json({ error: "Panier sans BOM" });
-    }
+      const basket = await odooCall("product.template", "read", [
+        [basketId],
+        ["bom_ids", "list_price"],
+      ]);
+      if (!basket?.length)
+        return res.status(400).json({ error: "Panier introuvable" });
 
-    const bom = await odooCall("mrp.bom", "read", [
-      basket[0].bom_ids,
-      ["bom_line_ids"],
-    ]);
-    if (!bom?.length || !bom[0].bom_line_ids?.length) {
-      return res.status(400).json({ error: "Nomenclature introuvable" });
-    }
+      const basketPrice = basket[0].list_price || 0;
 
-    const bomLines = await odooCall("mrp.bom.line", "read", [
-      bom[0].bom_line_ids,
-      ["product_id", "product_qty"],
-    ]);
-    const productIds = bomLines.map((l) => l.product_id[0]);
-    const productsData = await odooCall(
-      "product.product",
-      "search_read",
-      [[["id", "in", productIds]]],
-      { fields: ["id", "list_price"] },
-    );
+      const bomLines = basket[0].bom_ids?.length
+        ? await odooCall("mrp.bom.line", "read", [
+            basket[0].bom_ids,
+            ["product_id", "product_qty"],
+          ])
+        : [];
 
-    orderLines = bomLines.map((line) => {
-      const productData = productsData.find((p) => p.id === line.product_id[0]);
-      return [
+      orderLines = bomLines.map((line) => [
         0,
         0,
         {
           product_id: line.product_id[0],
           product_uom_qty: line.product_qty,
-          price_unit: productData ? productData.list_price : 0,
+          price_unit: 0, // ne pas additionner prix individuels
         },
-      ];
-    });
-  } else {
-    return res.status(400).json({ error: "Aucun panier ni produits fournis" });
-  }
-
-  console.log(
-    "\n📄 Lignes de commande finales:",
-    JSON.stringify(orderLines, null, 2),
-  );
-
-  // Créer la commande
-  const orderId = await odooCall("sale.order", "create", [
-    {
-      partner_id: customerId,
-      note: `Point de retrait: ${pickupPoint}`,
-      order_line: orderLines,
-    },
-  ]);
-  console.log("✅ Commande créée, ID:", orderId);
-
-  // Confirmer la commande
-  await odooCall("sale.order", "action_confirm", [[orderId]]);
-  console.log("✅ Commande confirmée");
-
-  // Récupérer pickings
-  const order = await odooCall("sale.order", "read", [
-    [orderId],
-    ["picking_ids"],
-  ]);
-  if (!order?.[0])
-    return res.status(500).json({ error: "Commande introuvable" });
-
-  const pickingIds = order[0].picking_ids || [];
-  console.log("📦 Picking IDs trouvés:", pickingIds);
-
-  for (const pickingId of pickingIds) {
-    try {
-      console.log(`\n🔍 === Traitement Picking ${pickingId} ===`);
-      const pickingBefore = await odooCall("stock.picking", "read", [
-        [pickingId],
-        [
-          "name",
-          "state",
-          "move_ids_without_package",
-          "location_id",
-          "location_dest_id",
-        ],
       ]);
-      console.log("📋 Picking AVANT validation:", pickingBefore[0]);
 
-      if (pickingBefore[0].move_ids_without_package?.length) {
-        const moves = await odooCall("stock.move", "read", [
-          pickingBefore[0].move_ids_without_package,
-          ["product_id", "product_uom_qty", "state"],
-        ]);
-        console.log("📦 Mouvements de stock:", moves);
-      }
-
-      await odooCall("stock.picking", "action_assign", [[pickingId]]);
-      console.log("✅ action_assign terminé");
-
-      const validateResult = await odooCall(
-        "stock.picking",
-        "button_validate",
-        [[pickingId]],
-      );
-      console.log("✅ button_validate retour:", validateResult);
-    } catch (err) {
-      console.error(`❌ Erreur validation picking ${pickingId}:`, err);
+      totalOrder = basketPrice; // ✅ Utiliser le prix global du panier
+    } else {
+      return res
+        .status(400)
+        .json({ error: "Aucun panier ni produits fournis" });
     }
-  }
 
-  res.json({ orderId });
+    console.log("📝 Détails des lignes de commande :", orderLines);
+    console.log("💰 Total commande calculé :", totalOrder);
+
+    // === 3️⃣ Vérifier la carte fidélité et ajouter points ===
+    const existingCard = await odooCall(
+      "loyalty.card",
+      "search_read",
+      [
+        [
+          ["program_id", "=", PROGRAM_ID],
+          ["partner_id", "=", customerId],
+        ],
+      ],
+      { fields: ["id", "points"] },
+    );
+
+    if (existingCard.length > 0) {
+      const cardId = existingCard[0].id;
+      const oldPoints = existingCard[0].points || 0;
+
+      await odooCall("loyalty.card", "write", [
+        [cardId],
+        { points: oldPoints + totalOrder },
+      ]);
+      console.log(
+        `⭐ Points fidélité mis à jour : ${oldPoints} -> ${
+          oldPoints + totalOrder
+        }`,
+      );
+    } else {
+      console.log("⚠️ Client n'a pas de carte fidélité, aucun point ajouté");
+    }
+
+    // === 4️⃣ Créer la commande dans Odoo ===
+    const orderId = await odooCall("sale.order", "create", [
+      {
+        partner_id: customerId,
+        note: `Point de retrait: ${pickupPoint}`,
+        order_line: orderLines,
+      },
+    ]);
+    console.log("📝 Commande créée avec ID:", orderId);
+
+    await odooCall("sale.order", "action_confirm", [[orderId]]);
+    console.log("✅ Commande confirmée");
+
+    // === 5️⃣ Envoyer email ===
+    const TEMPLATE_ID = 46;
+    await odooCall("mail.template", "send_mail", [TEMPLATE_ID, orderId, true]);
+    console.log("✉️ Email envoyé avec template ID:", TEMPLATE_ID);
+
+    // === 6️⃣ Valider pickings ===
+    const orderData = await odooCall("sale.order", "read", [
+      Array.isArray(orderId) ? orderId : [orderId],
+      ["picking_ids"],
+    ]);
+    const pickingIds = orderData[0]?.picking_ids || [];
+    for (const pickingId of pickingIds) {
+      try {
+        await odooCall("stock.picking", "action_assign", [[pickingId]]);
+        await odooCall("stock.picking", "button_validate", [[pickingId]]);
+        console.log("✅ Picking validé:", pickingId);
+      } catch (err) {
+        console.error(`❌ Erreur validation picking ${pickingId}:`, err);
+      }
+    }
+
+    res.json({
+      orderId,
+      pointsAdded: existingCard.length > 0 ? totalOrder : 0,
+    });
+  } catch (err) {
+    console.error("❌ Erreur /order :", err);
+    res.status(500).json({
+      error: "Impossible de créer la commande",
+      details: err.message || err,
+    });
+  }
 });
 
 // Créer abonnement
@@ -329,9 +359,74 @@ app.get("/baskets-with-products", async (req, res) => {
     }
 
     res.json(finalBaskets);
-  } catch (error) {
-    console.error("Erreur récupération paniers:", error);
+  } catch (err) {
+    console.error("Erreur récupération paniers:", err);
     res.status(500).json({ error: "Impossible de récupérer les paniers" });
+  }
+});
+
+// Inscription programme fidélité
+app.post("/loyalty/register", async (req, res) => {
+  const { name, email, phone, rgpdConsent } = req.body;
+
+  try {
+    await odooLogin();
+
+    const program = await odooCall("loyalty.program", "read", [[PROGRAM_ID]], {
+      fields: ["name"],
+    });
+    if (!program?.length)
+      return res.status(404).json({ error: "Programme fidélité introuvable" });
+
+    const existingCustomers = await odooCall(
+      "res.partner",
+      "search_read",
+      [[["email", "=", email]]],
+      { fields: ["id", "name"] },
+    );
+    let customerId = existingCustomers.length
+      ? existingCustomers[0].id
+      : await odooCall("res.partner", "create", [
+          { name, email, phone, customer_rank: 1 },
+        ]);
+
+    const existingCard = await odooCall(
+      "loyalty.card",
+      "search_read",
+      [
+        [
+          ["program_id", "=", PROGRAM_ID],
+          ["partner_id", "=", customerId],
+        ],
+      ],
+      { fields: ["id", "points"] },
+    );
+    let cardId, points;
+
+    if (!existingCard.length) {
+      cardId = await odooCall("loyalty.card", "create", [
+        { program_id: PROGRAM_ID, partner_id: customerId, points: 10 },
+      ]);
+      points = 10;
+    } else {
+      cardId = existingCard[0].id;
+      points = existingCard[0].points;
+    }
+
+    res.json({
+      success: true,
+      customerId,
+      cardId,
+      program,
+      points,
+      message: "Client inscrit au programme fidélité avec succès",
+    });
+  } catch (err) {
+    console.error("Erreur /loyalty/register :", err);
+    res.status(500).json({
+      error: "Impossible de vérifier ou inscrire le client au programme",
+      details: err.message || err,
+    });
   }
 });
 
