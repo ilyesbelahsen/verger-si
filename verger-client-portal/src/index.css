@@ -1,0 +1,172 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Source+Sans+3:wght@300;400;500;600&display=swap');
+
+/* Le Verger du Coin - Design System
+   Thème: Nature, Agriculture, Authenticité
+   Palette: Vert olive, Crème, Terre cuite, Brun
+*/
+
+@layer base {
+  :root {
+    /* Fond crème chaleureux */
+    --background: 40 33% 97%;
+    --foreground: 30 20% 18%;
+
+    /* Cartes légèrement plus claires */
+    --card: 40 30% 99%;
+    --card-foreground: 30 20% 18%;
+
+    --popover: 40 30% 99%;
+    --popover-foreground: 30 20% 18%;
+
+    /* Vert olive - couleur principale */
+    --primary: 90 18% 40%;
+    --primary-foreground: 40 30% 98%;
+
+    /* Crème plus foncé pour secondaire */
+    --secondary: 35 25% 90%;
+    --secondary-foreground: 30 20% 20%;
+
+    /* Tons neutres */
+    --muted: 35 15% 92%;
+    --muted-foreground: 30 10% 45%;
+
+    /* Terre cuite pour accents */
+    --accent: 18 55% 53%;
+    --accent-foreground: 40 30% 98%;
+
+    /* Rouge naturel pour destructive */
+    --destructive: 0 60% 50%;
+    --destructive-foreground: 40 30% 98%;
+
+    --border: 35 20% 85%;
+    --input: 35 20% 88%;
+    --ring: 90 18% 40%;
+
+    --radius: 0.75rem;
+
+    /* Couleurs personnalisées */
+    --olive: 90 18% 40%;
+    --olive-light: 90 15% 55%;
+    --olive-dark: 90 20% 30%;
+    --cream: 40 33% 97%;
+    --cream-dark: 35 25% 90%;
+    --terracotta: 18 55% 53%;
+    --terracotta-light: 18 50% 65%;
+    --brown: 30 20% 18%;
+    --brown-light: 30 15% 35%;
+
+    /* Gradients */
+    --gradient-hero: linear-gradient(135deg, hsl(90 18% 40%) 0%, hsl(90 20% 30%) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(40 30% 99%) 0%, hsl(35 25% 95%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(18 55% 53%) 0%, hsl(18 50% 45%) 100%);
+
+    /* Ombres */
+    --shadow-soft: 0 4px 20px -4px hsl(30 20% 18% / 0.08);
+    --shadow-card: 0 8px 30px -8px hsl(30 20% 18% / 0.12);
+    --shadow-elevated: 0 20px 50px -15px hsl(30 20% 18% / 0.15);
+
+    /* Sidebar */
+    --sidebar-background: 40 30% 98%;
+    --sidebar-foreground: 30 20% 25%;
+    --sidebar-primary: 90 18% 40%;
+    --sidebar-primary-foreground: 40 30% 98%;
+    --sidebar-accent: 35 25% 92%;
+    --sidebar-accent-foreground: 30 20% 20%;
+    --sidebar-border: 35 20% 88%;
+    --sidebar-ring: 90 18% 40%;
+  }
+
+  .dark {
+    --background: 30 15% 10%;
+    --foreground: 40 20% 95%;
+
+    --card: 30 15% 12%;
+    --card-foreground: 40 20% 95%;
+
+    --popover: 30 15% 12%;
+    --popover-foreground: 40 20% 95%;
+
+    --primary: 90 25% 50%;
+    --primary-foreground: 30 15% 10%;
+
+    --secondary: 30 12% 18%;
+    --secondary-foreground: 40 20% 90%;
+
+    --muted: 30 12% 18%;
+    --muted-foreground: 35 15% 60%;
+
+    --accent: 18 50% 55%;
+    --accent-foreground: 40 30% 98%;
+
+    --destructive: 0 55% 45%;
+    --destructive-foreground: 40 30% 98%;
+
+    --border: 30 12% 20%;
+    --input: 30 12% 20%;
+    --ring: 90 25% 50%;
+
+    --sidebar-background: 30 15% 8%;
+    --sidebar-foreground: 40 20% 90%;
+    --sidebar-primary: 90 25% 50%;
+    --sidebar-primary-foreground: 30 15% 10%;
+    --sidebar-accent: 30 12% 15%;
+    --sidebar-accent-foreground: 40 20% 90%;
+    --sidebar-border: 30 12% 18%;
+    --sidebar-ring: 90 25% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Source Sans 3', sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Playfair Display', serif;
+    @apply font-semibold tracking-tight;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: 'Playfair Display', serif;
+  }
+
+  .font-body {
+    font-family: 'Source Sans 3', sans-serif;
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent;
+    background-image: var(--gradient-hero);
+  }
+
+  .bg-hero-gradient {
+    background: var(--gradient-hero);
+  }
+
+  .bg-card-gradient {
+    background: var(--gradient-card);
+  }
+
+  .shadow-soft {
+    box-shadow: var(--shadow-soft);
+  }
+
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+
+  .shadow-elevated {
+    box-shadow: var(--shadow-elevated);
+  }
+}
