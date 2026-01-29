@@ -1,73 +1,63 @@
-# Welcome to your Lovable project
+# Verger du Coin - Portail Client
 
-## Project info
+Ce projet contient le système d'information du Verger du Coin, composé d'un front-end React pour les clients et d'un proxy back-end pour communiquer avec Odoo.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
 
-## How can I edit this code?
+## 📁 Structure du projet
 
-There are several ways of editing your application.
+```
+.
+├── verger-client-portal/     # Application React (front-end client)
+└── verger-odoo-proxy/         # Serveur proxy Node.js (back-end API)
+```
 
-**Use Lovable**
+## 🚀 Installation et lancement
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+### Prérequis
 
-Changes made via Lovable will be committed automatically to this repo.
+- Node.js (version 16 ou supérieure recommandée)
+- npm ou yarn
 
-**Use your preferred IDE**
+### 1. Front-end React (verger-client-portal)
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+```bash
+# Naviguer vers le dossier du portail client
+cd verger-client-portal
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+# Installer les dépendances
+npm install
 
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Lancer le serveur de développement
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+Le portail client sera accessible sur `http://localhost:8080` (ou le port indiqué dans le terminal).
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### 2. Back-end Proxy (verger-odoo-proxy)
 
-**Use GitHub Codespaces**
+```bash
+# Naviguer vers le dossier du proxy
+cd verger-odoo-proxy
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+# Installer les dépendances
+npm install
 
-## What technologies are used for this project?
+# Lancer le serveur proxy
+node serve.js
+```
 
-This project is built with:
+Le serveur proxy sera accessible sur `http://localhost:3001` (ou le port configuré).
 
-- Vite
-- TypeScript
+## 📦 Technologies utilisées
+
+### Front-end
 - React
-- shadcn-ui
-- Tailwind CSS
+- Vite
 
-## How can I deploy this project?
+### Back-end
+- Node.js
+- Express
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+## 🤝 Contribution
 
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Projet développé dans le cadre de la modernisation du SI du Verger du Coin.
