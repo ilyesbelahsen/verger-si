@@ -72,8 +72,6 @@ export interface OrderPayload {
 
 export interface SubscriptionPayload {
   customerId: number;
-  basketType: string;
-  weeks: number;
   pickupPoint: string;
 }
 

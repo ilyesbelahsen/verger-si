@@ -280,16 +280,52 @@ app.post("/order", async (req, res) => {
 });
 
 // Créer abonnement
+// Créer abonnement
+// Créer abonnement
 app.post("/subscription", async (req, res) => {
-  await odooLogin();
-  const subId = await odooCall("sale.subscription", "create", [
-    {
-      partner_id: req.body.customerId,
-      name: `Abonnement panier ${req.body.basketType}`,
-      recurring_rule_count: 4,
-    },
-  ]);
-  res.json({ subscriptionId: subId });
+  const { customerId, pickupPoint } = req.body;
+
+  try {
+    await odooLogin();
+
+    const PLAN_ID = 3; // Plan "Panier Découverte"
+    const PRODUCT_ID = 360; // Produit "Panier Abonnement Découverte"
+
+    // Créer la commande avec le plan récurrent
+    const orderId = await odooCall("sale.order", "create", [
+      {
+        partner_id: customerId,
+        plan_id: PLAN_ID,
+        order_line: [
+          [
+            0,
+            0,
+            {
+              product_id: PRODUCT_ID,
+              product_uom_qty: 1,
+            },
+          ],
+        ],
+        note: `Point de retrait: ${pickupPoint}`,
+      },
+    ]);
+
+    if (!orderId) {
+      throw new Error("Échec création commande");
+    }
+
+    console.log("✅ Commande créée:", orderId);
+
+    // Confirmer la commande pour activer l'abonnement
+    await odooCall("sale.order", "action_confirm", [[orderId]]);
+
+    console.log("✅ Abonnement activé");
+
+    res.json({ subscriptionId: orderId });
+  } catch (err) {
+    console.error("❌ Erreur subscription:", err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Récupérer paniers avec produits
