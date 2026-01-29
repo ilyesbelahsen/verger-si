@@ -67,6 +67,7 @@ export interface OrderPayload {
   basketId: number;
   pickupPoint: string;
   products?: OrderProduct[];
+  isDiscovery?: boolean;
 }
 
 export interface SubscriptionPayload {

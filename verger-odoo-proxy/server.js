@@ -169,47 +169,43 @@ app.post("/order", async (req, res) => {
         0,
       );
     }
-    // === 2️⃣ Panier avec BOM / préconfiguré ===
+    // === 2️⃣ Panier préfabriqué / BOM ===
     else if (basketId && basketId > 0) {
-      console.log("📦 Panier avec BOM ID:", basketId);
+      console.log("📦 Panier préfabriqué (KIT) ID:", basketId);
 
       const basket = await odooCall("product.template", "read", [
         [basketId],
-        ["bom_ids", "list_price"],
+        ["list_price", "product_variant_id"],
       ]);
+
       if (!basket?.length)
         return res.status(400).json({ error: "Panier introuvable" });
 
-      const basketPrice = basket[0].list_price || 0;
+      const variantId = basket[0].product_variant_id[0];
 
-      const bomLines = basket[0].bom_ids?.length
-        ? await odooCall("mrp.bom.line", "read", [
-            basket[0].bom_ids,
-            ["product_id", "product_qty"],
-          ])
-        : [];
+      orderLines = [
+        [
+          0,
+          0,
+          {
+            product_id: variantId,
+            product_uom_qty: 1,
+            price_unit: basket[0].list_price,
+          },
+        ],
+      ];
 
-      orderLines = bomLines.map((line) => [
-        0,
-        0,
-        {
-          product_id: line.product_id[0],
-          product_uom_qty: line.product_qty,
-          price_unit: 0, // ne pas additionner prix individuels
-        },
-      ]);
-
-      totalOrder = basketPrice; // ✅ Utiliser le prix global du panier
+      totalOrder = basket[0].list_price;
     } else {
       return res
         .status(400)
         .json({ error: "Aucun panier ni produits fournis" });
     }
 
-    console.log("📝 Détails des lignes de commande :", orderLines);
-    console.log("💰 Total commande calculé :", totalOrder);
+    console.log("📝 Lignes de commande finales :", orderLines);
+    console.log("💰 Total calculé :", totalOrder);
 
-    // === 3️⃣ Vérifier la carte fidélité et ajouter points ===
+    // === 3️⃣ Vérifier et mettre à jour la carte fidélité ===
     const existingCard = await odooCall(
       "loyalty.card",
       "search_read",
@@ -225,21 +221,18 @@ app.post("/order", async (req, res) => {
     if (existingCard.length > 0) {
       const cardId = existingCard[0].id;
       const oldPoints = existingCard[0].points || 0;
-
       await odooCall("loyalty.card", "write", [
         [cardId],
         { points: oldPoints + totalOrder },
       ]);
       console.log(
-        `⭐ Points fidélité mis à jour : ${oldPoints} -> ${
-          oldPoints + totalOrder
-        }`,
+        `⭐ Points fidélité mis à jour : ${oldPoints} -> ${oldPoints + totalOrder}`,
       );
     } else {
       console.log("⚠️ Client n'a pas de carte fidélité, aucun point ajouté");
     }
 
-    // === 4️⃣ Créer la commande dans Odoo ===
+    // === 4️⃣ Créer la commande ===
     const orderId = await odooCall("sale.order", "create", [
       {
         partner_id: customerId,
@@ -257,7 +250,7 @@ app.post("/order", async (req, res) => {
     await odooCall("mail.template", "send_mail", [TEMPLATE_ID, orderId, true]);
     console.log("✉️ Email envoyé avec template ID:", TEMPLATE_ID);
 
-    // === 6️⃣ Valider pickings ===
+    // === 6️⃣ Valider les pickings ===
     const orderData = await odooCall("sale.order", "read", [
       Array.isArray(orderId) ? orderId : [orderId],
       ["picking_ids"],
@@ -428,6 +421,38 @@ app.post("/loyalty/register", async (req, res) => {
       details: err.message || err,
     });
   }
+});
+
+app.post("/subscribe-discovery-basket", async (req, res) => {
+  const { customerId, pickupPoint } = req.body;
+
+  await odooLogin();
+
+  // ID du produit abonnement
+  const SUB_PRODUCT_ID = 555; // Panier Découverte Abonnement
+
+  const subscriptionId = await odooCall("sale.subscription", "create", [
+    {
+      partner_id: customerId,
+      template_id: 1, // ton modèle "Panier Découverte Hebdo"
+      recurring_invoice_line_ids: [
+        [
+          0,
+          0,
+          {
+            product_id: SUB_PRODUCT_ID,
+            quantity: 1,
+            price_unit: 12.99,
+          },
+        ],
+      ],
+      note: `Point de retrait: ${pickupPoint}`,
+    },
+  ]);
+
+  await odooCall("sale.subscription", "action_confirm", [[subscriptionId]]);
+
+  res.json({ subscriptionId });
 });
 
 app.listen(3001, () =>
